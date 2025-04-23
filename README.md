@@ -1,5 +1,5 @@
-# Projeto-INE5645
-Trabalho de semestre da matéria de Porogramação Paralela e Distribuída
+# Projeto de Porgramação Paralela & Distribuída - INE5645
+Trabalho de semestre da matéria de Programação Paralela e Distribuída
 
 ### Descrição do trabalho a ser feito
 
