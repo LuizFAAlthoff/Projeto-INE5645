@@ -1,41 +1,114 @@
-# Projeto de Programação Paralela & Distribuída - INE5645
-Trabalho de semestre da matéria de Programação Paralela e Distribuída
+# Mini SGBD Pipeline com Mutex, Cond e Semáforos
 
-### Descrição do trabalho a ser feito
+Projeto para a disciplina de **Programação Paralela e Distribuída**.
 
-Este trabalho explora o uso de padrões para programação multithread. A adoção de
-padrões de projeto para programação paralela visa atender requisitos de desempenho,
-escalabilidade, extensibilidade, integração, dentre outros. O grupo deverá propor uma
-aplicação concorrente de sua preferência, que tenha requisitos relevantes para a aplicação
-dos padrões escolhidos.
+Este projeto implementa um **Mini Sistema Gerenciador de Banco de Dados (SGBD)** concorrente, utilizando **Go** e mecanismos de sincronização manual (→ **Mutex**, **Cond**, **RWMutex**).
 
-Para o desenvolvimento desta aplicação, considere implementações concorrentes
-envolvendo a sincronização usando threads, processos ou coroutines. Além disso, será
-necessário utilizar estruturas de sincronização, como mutex, semáforos, barreiras e
-variáveis de condição. Não há restrição quanto a linguagem de programação utilizada,
-desde que a mesma explore adequadamente os aspectos de concorrência/paralelismo e
-sincronização necessários em sua aplicação.
 
-#### Requisitos e avaliação
-Os requisitos específicos são:
-* Implementar a aplicação concorrente utilizando pelo menos duas estruturas de
-sincronização diferentes e dois padrões de projeto; Deve ser entregue: o código com
-descrição (ex. arquivo readme) com detalhes para compilação, implantação e
-execução da aplicação;
-* Explicação dos da adoção dos dois padrões escolhidos no contexto da aplicação;
-* Apresentar em aula, no formato de seminário: a aplicação, detalhando as decisões
-de projeto (escolha de padrões e estruturas de sincronização) e os principais
-aspectos relacionados à implementação (discussão de tecnologias, configurações,
-linguagens e principais trechos de código).
-Para a avaliação será considerado:
-* A escolha da aplicação e uso adequado dos padrões. Isto significa que o uso dos
-padrões faz sentido para a aplicação escolhida;
-
-* Clareza na explicação sobre a adoção dos padrões escolhidos;
-* A explicação sobre a implementação, configuração e execução da aplicação.
-
-### Diagrama
+## Arquitetura
 
 ![Diagrama](diagrama.png)
 
+---
 
+## ✨ Funcionalidades
+
+- **Servidor TCP** que aceita **múltiplos clientes simultâneos**.
+- **Pipeline** com três estágios:
+  - **Parser** → interpreta comandos.
+  - **Executor** → executa ações sobre o banco.
+  - **Logger** → envia resultados para o cliente.
+- **Master-Worker** em cada estágio, criando workers conforme demanda.
+- Controle manual de concorrência sem `channels`.
+
+---
+
+## 🔁 Arquitetura do Pipeline
+
+1. Cliente envia comando.
+2. **Parser** interpreta o comando.
+3. **Executor** realiza operação no banco de dados.
+4. **Logger** envia resposta de volta.
+
+Cada etapa possui uma fila monitorada por um **Master**, que cria **Workers** para processar as tarefas.
+
+**Banco de dados**:
+- `db map[string]string` protegido por `sync.RWMutex` para operações de leitura e escrita concorrentes.
+
+---
+
+## 📂 Estrutura do Projeto
+
+- `main.go` → Inicia o servidor, masters e workers.
+- `ParsedCommand` → Struct que representa o comando trafegado no pipeline.
+- `db` → Banco de dados em memória protegido por `RWMutex`.
+- `parseQueue`, `execQueue`, `logQueue` → Filas com controle manual (`Mutex` + `Cond`).
+
+---
+
+## 🚀 Executando
+
+### 1. Requisitos
+- Go instalado (versão 1.18 ou superior)
+
+### 2. Rodando o servidor
+```bash
+# Na pasta do projeto
+go run cmd/server/main.go
+```
+
+O servidor iniciará ouvindo na porta `:9000`.
+
+### 3. Conectando um cliente
+
+Utilizando o cliente de teste na pasta client:
+```bash
+cd client
+go run .
+```
+
+Ou qualquer cliente TCP que envie comandos.
+
+### 4. Exemplos de Comandos
+
+- Definir valor:
+```bash
+SET nome Joao
+```
+- Buscar valor:
+```bash
+GET nome
+```
+
+**Resposta esperada**:
+```
+OK
+Joao
+```
+
+---
+
+## 📊 Padrões de Projeto Utilizados
+
+| Padrão            | Descrição |
+|--------------------|------------|
+| **Master-Worker**  | Cada estágio tem um master que cria workers para processar comandos concorrentes. |
+| **Pipeline**       | As operações fluem sequencialmente entre Parser → Executor → Logger via filas sincronizadas. |
+
+---
+
+## 🌐 Tecnologias
+
+- Linguagem: **Golang**
+- Concorrência manual: **Mutex**, **Cond**, **RWMutex**
+- Redes: **net TCP** (cliente-servidor)
+
+---
+
+## 💚 Licença
+
+Projeto acadêmico — uso livre para fins educacionais.
+
+---
+
+Feito com ❤️ para estudo e aprimoramento de paralelismo!
