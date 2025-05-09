@@ -2,56 +2,64 @@ package pipeline
 
 import (
 	"fmt"
+	"mini-sgbd/internal/config"
 	"mini-sgbd/internal/db"
 	"mini-sgbd/internal/model"
 	"sync"
 	"time"
 )
 
-var execQueue = make([]*model.ParsedCommand, 0)
-var execMutex = sync.Mutex{}
-var execCond = sync.NewCond(&execMutex)
+var execQueue = make([]*model.ParsedCommand, 0) //fila de execução
+var execMutex = sync.Mutex{}                    //mutex para a fila de execução
+var execCond = sync.NewCond(&execMutex)         //condição para a fila de execução
+var execWg sync.WaitGroup                       //grupo de espera para os workers de execução
 
 func StartExecMaster() {
-	go func() {
-		for {
-			execMutex.Lock()
-			for len(execQueue) == 0 {
-				execCond.Wait()
-			}
-			cmd := execQueue[0]
-			execQueue = execQueue[1:]
-			execMutex.Unlock()
-
-			go execWorker(cmd)
-		}
-	}()
-}
-
-func EnqueueExec(cmd *model.ParsedCommand) {
-	execMutex.Lock()
-	execQueue = append(execQueue, cmd)
-	execCond.Signal()
-	execMutex.Unlock()
-}
-
-func execWorker(cmd *model.ParsedCommand) {
-	fmt.Printf("[Executor] Executing: %s\n", cmd.Raw)
-	time.Sleep(100 * time.Millisecond)
-
-	switch cmd.Action {
-	case "GET":
-		db.Mutex.RLock()
-		cmd.Result = db.Data[cmd.Key]
-		db.Mutex.RUnlock()
-	case "SET":
-		db.Mutex.Lock()
-		db.Data[cmd.Key] = cmd.Value
-		db.Mutex.Unlock()
-		cmd.Result = "OK"
-	default:
-		cmd.Result = "ERROR: Unknown Command"
+	for i := 0; i < config.ExecWorkers; i++ { //inicia o executor com o número de workers especificado em config.ExecWorkers
+		execWg.Add(1)   //adiciona um worker ao grupo de espera
+		go execWorker() //inicia o worker
 	}
+}
 
-	EnqueueLog(cmd)
+func execWorker() { //função para o executor
+	defer execWg.Done() //finaliza o worker quando a função terminar
+	for {
+		execMutex.Lock()          //bloqueia o acesso ao execQueue
+		for len(execQueue) == 0 { //verifica se a fila de execução está vazia
+			execCond.Wait() //espera a fila de execução ter um comando
+		}
+		cmd := execQueue[0]       //pega o primeiro comando da fila
+		execQueue = execQueue[1:] //remove o primeiro comando da fila
+		execMutex.Unlock()        //libera o acesso ao execQueue
+
+		fmt.Printf("[Executor] Executing: %s\n", cmd.Raw) //printa o comando sendo executado
+		time.Sleep(100 * time.Millisecond)                //espera 100ms
+
+		switch cmd.Action {
+		case "GET":
+			db.Mutex.RLock()              //bloqueia o acesso ao banco de dados
+			cmd.Result = db.Data[cmd.Key] //define o resultado do comando
+			db.Mutex.RUnlock()            //libera o acesso ao banco de dados
+		case "SET":
+			db.Mutex.Lock()              //bloqueia o acesso ao banco de dados
+			db.Data[cmd.Key] = cmd.Value //define o valor do comando
+			db.Mutex.Unlock()            //libera o acesso ao banco de dados
+			cmd.Result = "OK"            //define o resultado do comando
+		default:
+			cmd.Result = "ERROR: Unknown Command"
+		}
+
+		EnqueueLog(cmd) //envia o comando para o logger
+	}
+}
+
+func EnqueueExec(cmd *model.ParsedCommand) { //função para enviar o comando para o executor
+	execMutex.Lock()                   //bloqueia o acesso ao execQueue
+	execQueue = append(execQueue, cmd) //adiciona o comando à fila de execução
+	execCond.Signal()                  //sinaliza que há um comando na fila de execução
+	execMutex.Unlock()                 //libera o acesso ao execQueue
+}
+
+func StopExecWorkers() { //função para parar os workers do executor
+	execWg.Wait() //espera todos os workers terminarem
 }
