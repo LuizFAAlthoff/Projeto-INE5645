@@ -1,0 +1,73 @@
+1. O QUE O PROJETO PEDE (PDF + README + IMAGEM)
+Você deve implementar um mini SGBD concorrente (um servidor de banco de dados simples), usando Go e concorrência manual (Mutex, Cond, RWMutex, sem channels).
+A arquitetura é um pipeline com três estágios, cada um com um padrão master-worker:
+Clientes conectam via TCP e enviam comandos (ex: SET nome Joao, GET nome).
+Parser: interpreta o comando recebido.
+Executor: executa a operação no banco de dados (em memória, protegido por RWMutex).
+Logger: envia a resposta de volta ao cliente.
+Cada estágio tem:
+Uma fila (queue) protegida por mutex/cond.
+Um master que gerencia a fila e cria workers para processar tarefas.
+
+2. ESTRUTURA DE PASTAS/CÓDIGOS
+/client
+Provavelmente contém um cliente de teste em Go (client.go) que conecta ao servidor, envia comandos e recebe respostas.
+
+/cmd/server/
+Aqui deve estar o ponto de entrada do servidor (main.go), que inicializa o banco, as filas, os masters/workers e o listener TCP.
+
+/internal/
+Organiza o código do servidor em módulos internos, geralmente para manter o código limpo e modularizado:
+
+/pipeline/:
+Provavelmente contém a lógica do pipeline (as filas, masters, workers, funções de enfileirar/desenfileirar, etc).
+
+/model/:
+Deve conter as structs principais, como ParsedCommand (representa um comando trafegando no pipeline).
+
+/db/:
+Implementação do banco de dados em memória, protegido por RWMutex.
+
+/connection/:
+Lida com a conexão TCP, aceitando clientes e repassando comandos para o pipeline.
+
+3. O QUE JÁ FOI FEITO (PROVÁVEL FLUXO)
+a) Cliente
+O /client/client.go conecta ao servidor, envia comandos e imprime as respostas.
+Serve para testar o servidor.
+
+b) Servidor
+O /cmd/server/main.go inicializa o sistema:
+Cria o banco de dados em memória.
+Cria as filas de cada estágio (parseQueue, execQueue, logQueue).
+Inicializa os masters de cada estágio (cada um fica esperando comandos na fila e dispara workers).
+Inicia o listener TCP para aceitar conexões de clientes.
+
+c) Pipeline
+O /internal/pipeline/ tem a lógica das filas, masters e workers:
+Cada fila é protegida por mutex/cond.
+Funções para enfileirar/desenfileirar comandos.
+Cada master fica em loop, pegando comandos da fila e disparando workers.
+Workers processam o comando e passam para a próxima fila.
+
+d) Model
+O /internal/model/ define as structs:
+ParsedCommand: representa um comando, com campos como clientConn, command, key, value, response, err.
+
+e) DB
+O /internal/db/ implementa o banco de dados:
+Um map protegido por RWMutex.
+Funções para Set e Get.
+
+f) Connection
+O /internal/connection/ lida com as conexões TCP:
+Aceita clientes.
+Lê linhas de comando.
+Cria um ParsedCommand e coloca na fila do parser.
+
+4. FLUXO DE EXECUÇÃO (RESUMO)
+Cliente conecta e envia comando.
+Servidor aceita conexão, lê comando, cria um ParsedCommand e coloca na parseQueue.
+Parser Master pega da fila, dispara um worker para interpretar o comando e coloca na execQueue.
+Executor Master pega da fila, dispara um worker para executar no banco e coloca na logQueue.
+Logger Master pega da fila, dispara um worker para enviar a resposta ao cliente.
