@@ -27,7 +27,7 @@ func parseWorker() { //função para o parser
 	for {
 		parseMutex.Lock()          //bloqueia o acesso ao parseQueue
 		for len(parseQueue) == 0 { //verifica se a fila de parse está vazia
-			parseCond.Wait() //espera a fila de parse ter um comando
+			parseCond.Wait() //espera a fila de parse ter um comando   !!! IMPORTANTE !!!
 		}
 		cmd := parseQueue[0]        //pega o primeiro comando da fila
 		parseQueue = parseQueue[1:] //remove o primeiro comando da fila
@@ -52,7 +52,7 @@ func parseWorker() { //função para o parser
 func EnqueueParse(cmd *model.ParsedCommand) { //função para enviar o comando para o parser
 	parseMutex.Lock()                    //bloqueia o acesso ao parseQueue
 	parseQueue = append(parseQueue, cmd) //adiciona o comando à fila de parse
-	parseCond.Signal()                   //sinaliza que há um comando na fila de parse
+	parseCond.Signal()                   //sinaliza que há um comando na fila de parse   !!! IMPORTANTE !!!
 	parseMutex.Unlock()                  //libera o acesso ao parseQueue
 }
 

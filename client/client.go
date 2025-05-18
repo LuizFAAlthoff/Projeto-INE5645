@@ -2,22 +2,25 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"math/rand"
 	"net"
+	"os"
+	"strings"
 	"sync"
 	"time"
 )
 
 const (
 	serverAddr        = "localhost:9000"
-	numClients        = 10 // Quantidade de clientes simultâneos
+	numClients        = 15 // Quantidade de clientes simultâneos
 	commandsPerClient = 5  // Quantidade de comandos que cada cliente enviará
 )
 
 var actions = []string{"SET", "GET"}
 
-func main() {
+func auto_command() {
 	var wg sync.WaitGroup
 	wg.Add(numClients)
 
@@ -66,5 +69,59 @@ func simulateClient(clientID int) {
 
 		// Pequeno atraso aleatório para simular comportamento real
 		time.Sleep(time.Millisecond * time.Duration(100+rand.Intn(200)))
+	}
+}
+
+func manual_command() {
+	conn, err := net.Dial("tcp", "localhost:9000")
+	if err != nil {
+		fmt.Println("Erro ao conectar ao servidor:", err)
+		return
+	}
+	defer conn.Close()
+
+	fmt.Println("Conectado ao Mini SGBD. Digite comandos como GET chave ou SET chave valor")
+	reader := bufio.NewReader(os.Stdin)
+	serverReader := bufio.NewReader(conn)
+
+	for {
+		fmt.Print("> ")
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println("Erro ao ler comando:", err)
+			return
+		}
+		line = strings.TrimSpace(line)
+		if line == "exit" || line == "quit" {
+			fmt.Println("Encerrando cliente.")
+			break
+		}
+
+		_, err = conn.Write([]byte(line + "\n"))
+		if err != nil {
+			fmt.Println("Erro ao enviar comando:", err)
+			return
+		}
+
+		// Aguarda resposta do servidor
+		response, err := serverReader.ReadString('\n')
+		if err != nil {
+			fmt.Println("Erro ao ler resposta:", err)
+			return
+		}
+		fmt.Printf("[Servidor] %s", response)
+	}
+}
+
+func main() {
+	mode := flag.String("mode", "auto", "Mode: manual or auto")
+	flag.Parse()
+
+	if *mode == "manual" {
+		manual_command()
+	} else if *mode == "auto" {
+		auto_command()
+	} else {
+		fmt.Println("Invalid mode. Use --mode=manual or --mode=auto")
 	}
 }

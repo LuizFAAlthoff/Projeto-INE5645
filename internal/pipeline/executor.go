@@ -35,11 +35,14 @@ func execWorker() { //função para o executor
 		fmt.Printf("[Executor] Executing: %s\n", cmd.Raw) //printa o comando sendo executado
 		time.Sleep(100 * time.Millisecond)                //espera 100ms
 
+		// dorme um tempo aleatorio entre 1 e 15 segundos
+		// time.Sleep(time.Duration(rand.Intn(15)+1) * time.Second)
+
 		switch cmd.Action {
 		case "GET":
-			db.Mutex.RLock()              //bloqueia o acesso ao banco de dados
+			db.Mutex.RLock()              //bloqueia o acesso ao banco de dados  !!! IMPORTANTE !!!
 			cmd.Result = db.Data[cmd.Key] //define o resultado do comando
-			db.Mutex.RUnlock()            //libera o acesso ao banco de dados
+			db.Mutex.RUnlock()            //libera o acesso ao banco de dados   !!! IMPORTANTE !!!
 		case "SET":
 			db.Mutex.Lock()              //bloqueia o acesso ao banco de dados
 			db.Data[cmd.Key] = cmd.Value //define o valor do comando
