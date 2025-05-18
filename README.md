@@ -18,8 +18,7 @@ Este projeto implementa um **Mini Sistema Gerenciador de Banco de Dados (SGBD)**
   - **Parser** → interpreta comandos.
   - **Executor** → executa ações sobre o banco.
   - **Logger** → envia resultados para o cliente.
-- **Master-Worker** em cada estágio, criando workers conforme demanda.
-- Controle manual de concorrência sem `channels`.
+- **Threadpool** em cada estágio, criando workers conforme o numero de threads da pool.
 
 ---
 
@@ -30,7 +29,7 @@ Este projeto implementa um **Mini Sistema Gerenciador de Banco de Dados (SGBD)**
 3. **Executor** realiza operação no banco de dados.
 4. **Logger** envia resposta de volta.
 
-Cada etapa possui uma fila monitorada por um **Master**, que cria **Workers** para processar as tarefas.
+Cada etapa possui uma fila com uma threadpool de workers trabalhando.
 
 **Banco de dados**:
 - `db map[string]string` protegido por `sync.RWMutex` para operações de leitura e escrita concorrentes.
@@ -62,9 +61,14 @@ O servidor iniciará ouvindo na porta `:9000`.
 ### 3. Conectando um cliente
 
 Utilizando o cliente de teste na pasta client:
+O cliente tem dois modos, **auto** e **manual**, para isso basta usar uma flag *mode* passando *manual* ou *auto*, se nenhuma for passada o padrão é **auto**
+
+O modo auto cria 10 clientes e faz os 10 enviarem comandos ao mesmo tempo para o servidor.
 ```bash
-cd client
-go run .
+# manual
+go run client/client.go --mode=manual
+# auto
+go run client/client.go --mode=auto
 ```
 
 Ou qualquer cliente TCP que envie comandos.
@@ -92,7 +96,7 @@ Joao
 
 | Padrão            | Descrição |
 |--------------------|------------|
-| **Master-Worker**  | Cada estágio tem um master que cria workers para processar comandos concorrentes. |
+| **Threadpool**  | Cada estágio tem uma Threadpool que cria workers para processar comandos concorrentes. |
 | **Pipeline**       | As operações fluem sequencialmente entre Parser → Executor → Logger via filas sincronizadas. |
 
 ---
